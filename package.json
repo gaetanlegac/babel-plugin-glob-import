@@ -1,0 +1,39 @@
+{
+    "name": "babel-plugin-glob-import",
+    "author": "Gaetan Le Gac <contact@gaetan-legac.fr>",
+    "description": "Babel plugin to import multiple modules with one import statement thanks to glob patterns.",
+    "keywords": [
+        "babel",
+        "glob",
+        "import",
+        "plugin",
+        "patterns"
+    ],
+    "version": "0.0.1",
+    "license": "MIT",
+    "private": false,
+    "main": "bin/index.js",
+    "files": [
+        "bin"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git://github.com/gaetanlegac/babel-plugin-glob-import.git"
+    },
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc -w",
+        "prepare": "npm run build"
+    },
+    "devDependencies": {
+        "@types/node": "^18.11.15",
+        "typescript": "^4.3.5",
+        "@babel/types": "^7.20.5"
+    },
+    "dependencies": {
+        "micromatch": "^4.0.5"
+    },
+    "peerDependencies": {
+        "@babel/core": "^7.20.5"
+    }
+}
