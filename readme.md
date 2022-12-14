@@ -176,3 +176,9 @@ BabelGlobImport({ }, [{
     }
 }])
 ```
+
+## TODO
+
+* Cleanup the code
+* Improve debugging
+* Improve the doc with more examples
