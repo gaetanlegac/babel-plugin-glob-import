@@ -36,10 +36,10 @@ import services from '@server/services/**.ts';
 Output:
 ```typescript
 import services_onboarding from '@server/services/onboarding.ts';
-import services_notifications from '@server/services/notifications.ts';
+import services_emails_notifications from '@server/services/emails/notifications.ts';
 const services = {
     onboarding: services_onboarding,
-    notifications: services_notifications,
+    'emails/notifications': services_emails_notifications,
 }
 ```
 
@@ -51,11 +51,11 @@ import * as templates from '@/earn/serveur/emails/*.hbs';
 ```
 Output:
 ```typescript
-import * as templates_notifications from '@/earn/serveur/emails/notifications.hbs';
-import * as templates_inscription from '@/earn/serveur/emails/inscription.hbs';
+import * as templates_onboarding from '@/earn/serveur/onboarding.hbs';
+import services_emails_notifications from '@server/services/emails/notifications.ts';
 const templates = {
-    notifications: templates_notifications,
-    inscription: templates_inscription,
+    onboarding: templates_onboarding,
+    'emails/notifications': services_emails_notifications,
 }
 ```
       
