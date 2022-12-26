@@ -16,18 +16,24 @@ import micromatch from 'micromatch';
 - REGEX
 ----------------------------------*/
 
-type TRequest = {
+type TRequestBase = {
     source: string,
     from: string
-} & ({
+}
+
+type TImportRequest = TRequestBase & {
     type: 'import',
     default?: string,
     specifiers: string[]
-} | {
-    type: 'require'
-})
+}
 
-type TImportType = 'import' | 'require';
+type TRequireRequest = TRequestBase & {
+    type: 'require'
+}
+
+type TRequest = TImportRequest | TRequireRequest
+
+type TImportType = TRequest["type"];
 
 type TUnresolvedRequest<ImportType extends TImportType = TImportType> = {
     source: string,
@@ -45,6 +51,7 @@ type TTransformer = (
 
 type TTransformRule = {
     test: (request: TUnresolvedRequest) => boolean,
+    globOnly?: boolean,
     replace: TTransformer
 }
 
@@ -87,8 +94,20 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
         replace: TTransformer | undefined
     } | null => {
 
-        const matchingRule = rules.find(({ test }) => test(request));
-        if (!request.source.includes('*'))
+        const containsGlob = request.source.includes('*');
+
+        const matchingRule = rules.find(({ test, globOnly }) => (
+            test(request) 
+            && 
+            (
+                globOnly === false 
+                || 
+                containsGlob
+            )
+        ));
+
+        // Nothing to process here
+        if (!matchingRule && !containsGlob)
             return null;
 
         let cheminGlob: string = request.source;
