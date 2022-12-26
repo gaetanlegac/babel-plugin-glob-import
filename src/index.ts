@@ -13,7 +13,7 @@ import generate from '@babel/generator';
 import micromatch from 'micromatch';
 
 /*----------------------------------
-- REGEX
+- TYPES: REQUEST
 ----------------------------------*/
 
 type TRequestBase = {
@@ -33,19 +33,24 @@ type TRequireRequest = TRequestBase & {
 
 type TRequest = TImportRequest | TRequireRequest
 
-type FileMatch = { filename: string, matches: string[] };
+/*----------------------------------
+- TYPES: TRANSFORMER
+----------------------------------*/
 
-type TTransformer = (
+type TTransformRule = {
+    test: (request: TRequest) => boolean,
+    globOnly?: boolean,
+    replace: TTransformerFunc,
+    debug?: boolean
+}
+
+type TTransformerFunc = (
     request: TRequest,
     matches: FileMatch[],
     t: typeof types
 ) => types.Statement[] | void
 
-type TTransformRule = {
-    test: (request: TRequest) => boolean,
-    globOnly?: boolean,
-    replace: TTransformer
-}
+type FileMatch = { filename: string, matches: string[] };
 
 type TOptions = {
     debug?: boolean,
@@ -82,8 +87,9 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
     const t = babel.types as typeof types;
 
     const findFiles = (request: TRequest): { 
+        transformer?: TTransformRule,
         files: FileMatch[], 
-        replace: TTransformer | undefined
+        replace: TTransformerFunc | undefined
     } | null => {
 
         const containsGlob = request.source.includes('*');
@@ -102,6 +108,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
         if (!matchingRule && !containsGlob)
             return null;
 
+        const debugRule = debug || matchingRule;
         let cheminGlob: string = request.source;
 
         // Chemin relatif => Transformation en absolu
@@ -117,7 +124,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
         const allfiles = getFiles(rootDir);
 
         // Find matches + keep captured groups
-        debug && console.log(`Searching for files matching ${request.source} in directory ${rootDir}`);
+        debugRule && console.log(`Searching for files matching ${request.source} in directory ${rootDir}`);
         const regex = micromatch.makeRe(cheminGlob, { capture: true });
         const matchedFiles: FileMatch[] = [];
         for (const file of allfiles) {
@@ -125,9 +132,13 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
             if (matches) 
                 matchedFiles.push({ filename: file, matches: matches.slice(1) });
         }
-        debug && console.log('IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
+        debugRule && console.log('IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
 
-        return { files: matchedFiles, replace: matchingRule?.replace };
+        return { 
+            transformer: matchingRule,
+            files: matchedFiles, 
+            replace: matchingRule?.replace 
+        };
      }
 
     const plugin: PluginObj<{ fichier: string }> = {
@@ -172,11 +183,13 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
 
                 }
 
-                /*debug && console.log(
+                const debugRule = debug || result.transformer?.debug;
+                (debugRule && replacement) && console.log(
                     generate(instruction.node).code,
                     '=>',
-                    generate(t.program(replacement)).code,
-                );*/
+                    // @ts-ignore (TODO: to solve)
+                    generate( t.program(replacement) ).code,
+                );
 
                 instruction.replaceWithMultiple(replacement);
 
@@ -330,7 +343,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
                         )
                 }
 
-                debug && console.log(
+                (debug || result.transformer?.debug) && console.log(
                     generate(instruction.node).code,
                     '=>',
                     replacement ? generate( t.program(replacement) ).code : 'void',
