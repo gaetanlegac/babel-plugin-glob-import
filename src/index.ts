@@ -108,7 +108,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
         if (!matchingRule && !containsGlob)
             return null;
 
-        const debugRule = debug || matchingRule;
+        const debugRule = debug || matchingRule?.debug;
         let cheminGlob: string = request.source;
 
         // Chemin relatif => Transformation en absolu
@@ -118,21 +118,24 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
         else if (removeAliases !== undefined)
             cheminGlob = removeAliases(request.source);
 
-        // List files in the search directory
-        const wildcardPos = cheminGlob.indexOf('*');
-        const rootDir = cheminGlob.substring(0, wildcardPos);
-        const allfiles = getFiles(rootDir);
-
-        // Find matches + keep captured groups
-        debugRule && console.log(`Searching for files matching ${request.source} in directory ${rootDir}`);
-        const regex = micromatch.makeRe(cheminGlob, { capture: true });
+        // If glob, list files in the search directory
         const matchedFiles: FileMatch[] = [];
-        for (const file of allfiles) {
-            const matches = file.match(regex);
-            if (matches) 
-                matchedFiles.push({ filename: file, matches: matches.slice(1) });
+        const wildcardPos = cheminGlob.indexOf('*');
+        if (wildcardPos !== -1) {
+
+            const rootDir = cheminGlob.substring(0, wildcardPos);
+            const allfiles = getFiles(rootDir);
+
+            // Find matches + keep captured groups
+            debugRule && console.log(`Searching for files matching ${request.source} in directory ${rootDir}`);
+            const regex = micromatch.makeRe(cheminGlob, { capture: true });
+            for (const file of allfiles) {
+                const matches = file.match(regex);
+                if (matches) 
+                    matchedFiles.push({ filename: file, matches: matches.slice(1) });
+            }
+            debugRule && console.log('IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
         }
-        debugRule && console.log('IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
 
         return { 
             transformer: matchingRule,
