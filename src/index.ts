@@ -33,14 +33,6 @@ type TRequireRequest = TRequestBase & {
 
 type TRequest = TImportRequest | TRequireRequest
 
-type TImportType = TRequest["type"];
-
-type TUnresolvedRequest<ImportType extends TImportType = TImportType> = {
-    source: string,
-    from: string,
-    type: ImportType,
-}
-
 type FileMatch = { filename: string, matches: string[] };
 
 type TTransformer = (
@@ -50,7 +42,7 @@ type TTransformer = (
 ) => types.Statement[] | void
 
 type TTransformRule = {
-    test: (request: TUnresolvedRequest) => boolean,
+    test: (request: TRequest) => boolean,
     globOnly?: boolean,
     replace: TTransformer
 }
@@ -89,7 +81,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
 
     const t = babel.types as typeof types;
 
-    const findFiles = (request: TUnresolvedRequest): { 
+    const findFiles = (request: TRequest): { 
         files: FileMatch[], 
         replace: TTransformer | undefined
     } | null => {
@@ -158,7 +150,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
                 const chemin = args[0].value;
 
                 // Glob
-                const unresolvedRequest: TUnresolvedRequest<'require'> = {
+                const unresolvedRequest: TRequireRequest = {
                     type: 'require',
                     source: chemin,
                     from: this.fichier
@@ -193,14 +185,6 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
             ImportDeclaration(instruction) {
 
                 const chemin = instruction.node.source.value;
-                const unresolvedRequest: TUnresolvedRequest = {
-                    type: 'import',
-                    source: chemin,
-                    from: this.fichier
-                };
-                const result = findFiles(unresolvedRequest);
-                if (result === null) return;
-                const { replace, files } = result
 
                 // Référe,ncement des noms à importer
                 let importDefault: string | undefined = undefined;
@@ -250,14 +234,21 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
                     }
 
                 }
+                const request: TImportRequest = {
+                    type: 'import',
+                    source: chemin,
+                    from: this.fichier,
+                    default: importDefault,
+                    specifiers: importClassique
+                };
+
+                const result = findFiles(request);
+                if (result === null) return;
+                const { replace, files } = result
 
                 let replacement: types.Statement[] | void;
                 if (replace !== undefined)
-                    replacement = replace({
-                        ...unresolvedRequest,
-                        default: importDefault,
-                        specifiers: importClassique
-                    }, files, t);
+                    replacement = replace(request, files, t);
 
                 if (replacement === undefined) {
 
