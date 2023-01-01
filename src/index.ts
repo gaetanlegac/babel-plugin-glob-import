@@ -308,7 +308,7 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: TTr
                             // import <prefixe>_<nom> from <chemin>
                             else if (importDefault !== undefined) {
                                 nomImport = importDefault + '_' + nomFichierPourImport.replace(
-                                    /[ \/]/g, '_'
+                                    /[^a-z0-9]/gi, '_'
                                 );
                                 nomImports.push([nomImport, nomFichierPourImport])
                             } else
