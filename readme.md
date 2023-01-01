@@ -1,8 +1,10 @@
 # Babel Glob Import
 
-Babel plugin to import multiple modules with one import statement thanks to glob patterns.
+Babel plugin to use glob patterns in import and require statements.
 
-[![npm](https://img.shields.io/npm/v/babel-plugin-glob-import)](https://www.npmjs.com/package/babel-plugin-glob-import)
+[![npm](https://img.shields.io/npm/v/babel-plugin-glob-import)](https://www.npmjs.com/package/babel-plugin-glob-import) [![npm](https://img.shields.io/npm/dw/babel-plugin-glob-import)](https://www.npmjs.com/package/babel-plugin-glob-import)
+
+/!\ This module is still in testing and may be unstable in several scenarios.
 
 ## Installation
 
@@ -25,52 +27,190 @@ const babelGlobImport = BabelGlobImport({
 })
 ```
 
-## Types of importation
+## Usage by examples
 
-### 1. Import the default export of every module into one object
+Let consider that the folder `@server/routes` contains the following files:
+- index.ts
+- users/
+    - index.ts
+    - auth/
+        google.ts
 
-Input:
+For this example, we assume that these three .ts files exports a function.
+
+This plugin provides four different ways to import these files in one shot via glob patterns:
+
+### 1. Import default
+
+Import the default export of every module into one object.
+
 ```typescript
-import services from '@server/services/**.ts';
+import routes from '@server/routes/**/*.ts';
 ```
-Output:
+
 ```typescript
-import services_onboarding from '@server/services/onboarding.ts';
-import services_emails_notifications from '@server/services/emails/notifications.ts';
-const services = {
-    onboarding: services_onboarding,
-    'emails/notifications': services_emails_notifications,
+> console.log(routes)
+{
+    'index': Function,
+    'users/index': Function,
+    'users/auth/google': Function,
 }
 ```
 
-### 2. Import all exports of every module into one object
+**With metadatas:**
 
-Input:
+In addition of the modules, you can get the metadata of each import by prefixing the glob expression by `metas:`:
+
+
 ```typescript
-import * as templates from '@/earn/serveur/emails/*.hbs';
+import routes from 'metas:@server/routes/**/*.ts';
 ```
-Output:
+
 ```typescript
-import * as templates_onboarding from '@/earn/serveur/onboarding.hbs';
-import services_emails_notifications from '@server/services/emails/notifications.ts';
-const templates = {
-    onboarding: templates_onboarding,
-    'emails/notifications': services_emails_notifications,
+> console.log(routes)
+{
+    'index': {
+        filename: '/root/server/routes/index.ts',
+        matches: [undefined, 'index'],
+        exports: Function
+    },
+    'users/index': {
+        filename: '/root/server/routes/users/index.ts',
+        matches: ['users', 'index'],
+        exports: Function
+    },,
+    'users/auth/google': {
+        filename: '/root/server/routes/users/auth/google.ts',
+        matches: ['users', 'auth', 'google'],
+        exports: Function
+    },
+}
+```
+
+### 2. Import all (Typescript)
+
+Import all exports of every module into one object.
+
+```typescript
+import * as routes from '@server/routes/**/*.ts';
+```
+```typescript
+> console.log(routes)
+{
+    'index': { default: Function },
+    'users/index': { default: Function },
+    'users/auth/google': { default: Function },
+}
+```
+
+**With metadatas:**
+
+```typescript
+import * as routes from 'metas:@server/routes/**/*.ts';
+```
+```typescript
+> console.log(routes)
+{
+    'index': {
+        filename: '/root/server/routes/index.ts',
+        matches: [undefined, 'index'],
+        exports: { default: Function }
+    },
+    'users/index': {
+        filename: '/root/server/routes/users/index.ts',
+        matches: ['users', 'index'],
+        exports: { default: Function }
+    },,
+    'users/auth/google': {
+        filename: '/root/server/routes/users/auth/google.ts',
+        matches: ['users', 'auth', 'google'],
+        exports: { default: Function }
+    },
 }
 ```
       
+### 3. Import with destructuration
 
-### 3. Import the default export of every module separately
+Import the default export of every module separately.
 
-Input:
 ```typescript
-import { onboarding, notifications } from '@server/services/**.ts';
+import { index, users_index, users_auth_google } from '@server/routes/**/*.ts';
 ```
-Output:
 ```typescript
-import onboarding from '@server/services/onboarding.ts';
-import notifications from '@server/services/notifications.ts';
-```                  
+> console.log({ index, users_index, users_auth_google })
+{
+    'index': Function,
+    'users_index': Function,
+    'users_auth_google': Function,
+}
+```    
+
+**With metadatas:**
+
+```typescript
+import { index, users_index, users_auth_google } from 'metas:@server/routes/**/*.ts';
+```
+```typescript
+> console.log({ index, users_index, users_auth_google })
+{
+    'index': {
+        filename: '/root/server/routes/index.ts',
+        matches: [undefined, 'index'],
+        exports: Function
+    },
+    'users_index': {
+        filename: '/root/server/routes/users/index.ts',
+        matches: ['users', 'index'],
+        exports: Function
+    },,
+    'users_auth_google': {
+        filename: '/root/server/routes/users, auth/google.ts',
+        matches: ['users', 'auth', 'google'],
+        exports: Function
+    },
+}
+``` 
+
+### 4. Require
+
+```typescript
+const routes = require("@server/routes/**/*.ts");
+```
+```typescript
+> console.log(routes)
+[
+    Function,
+    Function,
+    Function
+]
+```  
+
+**With metadatas:**
+
+```typescript
+const routes = require("metas:@server/routes/**/*.ts");
+```
+```typescript
+> console.log(routes)
+[
+    {
+        filename: '/root/server/routes/index.ts',
+        matches: [undefined, 'index'],
+        exports: Function
+    },
+    {
+        filename: '/root/server/routes/users/index.ts',
+        matches: ['users', 'index'],
+        exports: Function
+    },
+    {
+        filename: '/root/server/routes/users/auth/google.ts',
+        matches: ['users', 'auth', 'google'],
+        exports: Function
+    },
+]
+``` 
+
 
 ## Setup example with Webpack
 
@@ -117,9 +257,23 @@ Typescript will not recognize your glob importations statements, and will show s
 To fix that, you have to create a type definitions file (ex: `global.d.ts`) and to manually define typings for the imported glob into this file:
 
 ```typescript
-declare module "@client/pages/\*.tsx" {
-    const value: import("../client/router/page").Page;
-    export = value;
+declare module "@server/routes/**/*.ts" {
+
+    const Route: import("@server/services/router").Route;
+
+    export = Route;
+}
+```
+
+If you imports metadatas, you can use the `GlobImportedWithMetas` generic:
+
+```typescript
+declare module "metas:@server/routes/**/*.ts" {
+
+    const Route: import("@server/services/router").Route;
+    const GlobImportedWithMetas: import('babel-plugin-glob-import').GlobImportedWithMetas;
+
+    export = GlobImportedWithMetas<Route>;
 }
 ```
 
@@ -176,6 +330,15 @@ BabelGlobImport({ }, [{
     }
 }])
 ```
+
+## Changelog
+
+### 01/01/2023
+
+- Export the plugin factory via module.exports
+- Added possibility to get importation metadata (by prefixing the glob path by `metas:`)
+- Code clearnup & restructuration
+- Fix bad characters in importation names
 
 ## TODO
 
