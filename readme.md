@@ -317,7 +317,7 @@ BabelGlobImport({ }, [{
         request.type === 'import' 
         && 
         // models
-        request.default !== undefined
+        request.imported.type === 'default'
         && 
         // from '@models';
         request.source === '@models' 
@@ -328,7 +328,7 @@ BabelGlobImport({ }, [{
         // import
         return t.importDeclaration(
             // models
-            [t.importDefaultSpecifier( t.identifier(request.default) )],
+            [t.importDefaultSpecifier( t.identifier( request.imported.name ))],
             // from "@server/models/index.ts";
             t.stringLiteral("@server/models/index.ts")
         )
