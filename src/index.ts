@@ -187,11 +187,11 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 const importedfiles = request.withMetas
                     ? importations.files.map( file => t.objectProperty(
                         t.stringLiteral(file.imported),
-                        t.identifier(file.local),
+                        fileMetasObject( file, t.identifier(file.local ))
                     ))
                     : importations.files.map( file => t.objectProperty(
                         t.stringLiteral(file.imported),
-                        fileMetasObject( file, t.identifier(file.local ))
+                        t.identifier(file.local),
                     ))
 
                 replacement = [
