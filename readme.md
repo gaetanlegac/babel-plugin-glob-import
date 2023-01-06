@@ -307,7 +307,11 @@ This example replaces `import models from "@models"` by `import models from "@se
 
 ```typescript
 BabelGlobImport({ }, [{
-    // import 
+
+    // (Optional) Giving a name to your transformer will make debugging easier
+    name: 'Models import shortcut',
+
+    // Match the import we want to replace 
     test: (request) => (
         // import
         request.type === 'import' 
@@ -318,7 +322,8 @@ BabelGlobImport({ }, [{
         // from '@models';
         request.source === '@models' 
     ),
-    // We replace 
+
+    // If matched, replace it
     replace: (request, matches, t) => {
         // import
         return t.importDeclaration(
@@ -332,6 +337,15 @@ BabelGlobImport({ }, [{
 ```
 
 ## Changelog
+
+### 06/01/2023
+
+- Add a comment before an import to debug it. Ex:
+```typescript
+// @babel-debug
+import * from 'metas:./**/*.ts';
+```
+- Possibility to add a name to each transformer to improve debugging
 
 ### 01/01/2023
 

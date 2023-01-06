@@ -1,7 +1,7 @@
 {
     "name": "babel-plugin-glob-import",
     "author": "Gaetan Le Gac <contact@gaetan-legac.fr>",
-    "description": "Babel plugin to import multiple modules with one import statement thanks to glob patterns.",
+    "description": "Babel plugin to use glob patterns in import and require statements.",
     "keywords": [
         "babel",
         "glob",
@@ -9,7 +9,7 @@
         "plugin",
         "patterns"
     ],
-    "version": "0.0.4",
+    "version": "0.0.5",
     "license": "MIT",
     "private": false,
     "main": "bin/index.js",

@@ -21,7 +21,7 @@ import type {
     TRequest,
     TRequireRequest, 
     TImportRequest,
-    TransformerFunc,
+    TFoundFiles,
 
     FileMatch,
     ImportedFile,
@@ -46,7 +46,7 @@ const MetasPrefix = 'metas:';
 /*----------------------------------
 - PLUGIN
 ----------------------------------*/
-function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: ImportTransformer[] }) {
+function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
 
     /*----------------------------------
     - DEFINITION
@@ -106,9 +106,9 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: Imp
         }
 
         // Find files matched b the glob expression
-        const result = findFiles(request);
-        if (result === null) return;
-        const { replace, files } = result
+        const found = findFiles(request);
+        if (found === null) return;
+        const { replace, files } = found
         let replacement: types.Statement[] | void;
 
         // Custom rule
@@ -152,13 +152,8 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: Imp
                 ]
             }
         }
-
-        const debugRule = debug || result.transformer?.debug;
-        (debugRule && replacement) && console.log(
-            generate(instruction.node).code,
-            '=>',
-            generate( t.program(replacement) ).code,
-        );
+        
+        debugReplacement(instruction, found, replacement);
 
         instruction.replaceWithMultiple(replacement);
     }
@@ -169,9 +164,9 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: Imp
         const request = getImportRequest(instruction.node);
 
         // Find files matched b the glob expression
-        const result = findFiles(request);
-        if (result === null) return;
-        const { replace, files } = result
+        const found = findFiles(request);
+        if (found === null) return;
+        const { replace, files } = found
         let replacement: types.Statement[] | void;
 
         // Custom replacement rule (defined in the plugin options)
@@ -210,13 +205,36 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: Imp
                 
         }
 
-        (debug || result.transformer?.debug) && console.log(
-            generate(instruction.node).code,
-            '=>',
-            replacement ? generate( t.program(replacement) ).code : 'void',
-        );
+        debugReplacement(instruction, found, replacement);
         
         instruction.replaceWithMultiple(replacement);
+    }
+
+    function debugReplacement(
+        instruction: NodePath<types.CallExpression> | NodePath<types.ImportDeclaration>,
+        found: TFoundFiles,
+        replacement: types.Statement[] | void
+    ) {
+
+        const hasDebugComment = instruction.node.leadingComments?.find(
+            comment => comment.value === ' @babel-debug'
+        );
+
+        let debugWhat: string;
+        if (hasDebugComment)
+            debugWhat = 'import instruction';
+        else if (found.transformer?.debug)
+            debugWhat = 'transformer' + (found.transformer.name ? ' ' + found.transformer.name : '');
+        else if (options.debug)
+            debugWhat = 'glob import plugin';
+        else return;
+
+        console.log(
+            "Debug " + debugWhat + " in file " + currentFile + '.\nTransform:\n',
+            generate(instruction.node).code,
+            '\nInto:\n',
+            replacement ? generate( t.program(replacement) ).code : 'nothing',
+        );
     }
 
     function getImportRequest( node: types.ImportDeclaration ): TImportRequest {
@@ -356,15 +374,11 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: Imp
     /*----------------------------------
     - FILES
     ----------------------------------*/
-    function findFiles(request: TRequest): { 
-        transformer?: ImportTransformer,
-        files: FileMatch[], 
-        replace: TransformerFunc | undefined
-    } | null {
+    function findFiles(request: TRequest): TFoundFiles | null {
 
         const containsGlob = request.source.includes('*');
 
-        const matchingRule = rules.find(({ test, globOnly }) => (
+        const matchingRule = options.rules.find(({ test, globOnly }) => (
             test(request) 
             && 
             (
@@ -378,15 +392,15 @@ function Plugin (babel, { rules, debug, removeAliases }: TOptions & { rules: Imp
         if (!matchingRule && !containsGlob)
             return null;
 
-        const debugRule = debug || matchingRule?.debug;
+        const debugRule = options.debug || matchingRule?.debug;
         let cheminGlob: string = request.source;
 
         // Chemin relatif => Transformation en absolu
         if (cheminGlob[0] === '.')
             cheminGlob = path.resolve( path.dirname(request.from), request.source );
         // Chemin absolu => Remplacement alias
-        else if (removeAliases !== undefined)
-            cheminGlob = removeAliases(request.source);
+        else if (options.removeAliases !== undefined)
+            cheminGlob = options.removeAliases(request.source);
 
         // If glob, list files in the search directory
         const matchedFiles: FileMatch[] = [];

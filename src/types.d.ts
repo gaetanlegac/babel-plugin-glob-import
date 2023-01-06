@@ -37,10 +37,17 @@ export type TRequest = TImportRequest | TRequireRequest
 ----------------------------------*/
 
 export type ImportTransformer = {
+    name?: string,
     test: (request: TRequest) => boolean,
     globOnly?: boolean,
     replace: TransformerFunc,
     debug?: boolean
+}
+
+export type TFoundFiles = { 
+    transformer?: ImportTransformer,
+    files: FileMatch[], 
+    replace: TransformerFunc | undefined
 }
 
 export type TransformerFunc = (
