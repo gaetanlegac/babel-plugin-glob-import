@@ -19,8 +19,9 @@ import type {
     ImportTransformer,
 
     TRequest,
-    TRequireRequest, 
     TImportRequest,
+    TImportedElements,
+    TRequireRequest, 
     TFoundFiles,
 
     FileMatch,
@@ -41,6 +42,7 @@ export default ruleBuilder;
 - CONFIG
 ----------------------------------*/
 
+const LogPrefix = '[babel][glob-imports]';
 const MetasPrefix = 'metas:';
 
 /*----------------------------------
@@ -153,7 +155,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             }
         }
         
-        debugReplacement(instruction, found, replacement);
+        debugReplacement(instruction, request, found, replacement);
 
         instruction.replaceWithMultiple(replacement);
     }
@@ -180,23 +182,23 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             const importations = importfiles(files, request);
 
             // Combine the imported files in one object
-            if (request.default !== undefined) {
+            if (request.imported.type === 'default' || request.imported.type === 'all') {
 
                 const importedfiles = request.withMetas
                     ? importations.files.map( file => t.objectProperty(
-                        t.stringLiteral(file.local),
-                        t.identifier(file.imported),
+                        t.stringLiteral(file.imported),
+                        t.identifier(file.local),
                     ))
                     : importations.files.map( file => t.objectProperty(
-                        t.stringLiteral(file.local),
-                        fileMetasObject( file, t.identifier(file.imported ))
+                        t.stringLiteral(file.imported),
+                        fileMetasObject( file, t.identifier(file.local ))
                     ))
 
                 replacement = [
                     ...importations.declarations,
                     t.variableDeclaration('const', [
                         t.variableDeclarator(
-                            t.identifier(request.default),
+                            t.identifier(request.imported.name),
                             t.objectExpression(importedfiles)
                         )
                     ])
@@ -205,13 +207,14 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 
         }
 
-        debugReplacement(instruction, found, replacement);
+        debugReplacement(instruction, request, found, replacement);
         
         instruction.replaceWithMultiple(replacement);
     }
 
     function debugReplacement(
         instruction: NodePath<types.CallExpression> | NodePath<types.ImportDeclaration>,
+        request: TImportRequest | TRequireRequest,
         found: TFoundFiles,
         replacement: types.Statement[] | void
     ) {
@@ -229,19 +232,27 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             debugWhat = 'glob import plugin';
         else return;
 
-        console.log(
-            "Debug " + debugWhat + " in file " + currentFile + '.\nTransform:\n',
+        console.log( LogPrefix,
+            "Debug " + debugWhat + " in file " + currentFile + '.',
+
+            dbgTitle('Original import:'),
             generate(instruction.node).code,
-            '\nInto:\n',
+
+            dbgTitle('Parsed import:'),
+            request,
+
+            dbgTitle('Generated import:'),
             replacement ? generate( t.program(replacement) ).code : 'nothing',
         );
     }
 
+    function dbgTitle( title: string ) {
+        return '\n------- ' + title + ' ----------------------\n';
+    }
+
     function getImportRequest( node: types.ImportDeclaration ): TImportRequest {
 
-        let importDefault: string | undefined = undefined;
-        let importClassique: string[] = []
-        let importAll: boolean = false;
+        let imported: TImportedElements | undefined = undefined;
         for (const specifier of node.specifiers) {
 
             /*
@@ -256,7 +267,10 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             */
             if (specifier.type === 'ImportDefaultSpecifier') {
 
-                importDefault = specifier.local.name;
+                imported = {
+                    type: 'default',
+                    name: specifier.local.name
+                }
 
             /*
                 import { notifications, inscription } from '@/earn/serveur/emails/*.hbs';
@@ -266,7 +280,10 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             */
             } else if (specifier.type === 'ImportSpecifier') {
 
-                importClassique.push( specifier.local.name );
+                imported = {
+                    type: 'destructuration',
+                    names: [specifier.local.name]
+                }
 
             /*
                 import * as templates from '@/earn/serveur/emails/*.hbs';
@@ -280,19 +297,22 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             */
             } else if (specifier.type === 'ImportNamespaceSpecifier') {
 
-                importDefault = specifier.local.name;
-                importAll = true;
+                imported = {
+                    type: 'all',
+                    name: specifier.local.name
+                }
 
+            } else {
+
+                console.warn(LogPrefix, `Unsupported import specifier type:`, specifier["type"]);
             }
         }
 
+        // Create import request
         const request: TImportRequest = {
             type: 'import',
-            default: importDefault,
-            specifiers: importClassique,
-            all: importAll,
+            imported: imported,
             source: node.source.value,
-
             from: currentFile,
             withMetas: false
         }
@@ -317,17 +337,10 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             if (file.filename === currentFile)
                 continue;
 
-            // import <chemin>
-            if (request.specifiers.length === 0) {
-
-                importDeclarations.push(
-                    t.importDeclaration(
-                        [],
-                        t.stringLiteral(file.filename)
-                    )
-                );
-
-            } else {
+            // Import specifiers
+            let importSpecifier: types.ImportDeclaration["specifiers"][number];
+            const imported = request.imported;
+            if (imported !== undefined) {
 
                 // Création nom d'importation via le nom du file
                 const posSlash = file.filename.lastIndexOf('/') + 1;
@@ -338,34 +351,52 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 )
                 const nomFichierPourImport = file.matches.join('_')
                 
-                let nomImport: string;
-                // import <nom> from <chemin>
-                if (request.specifiers.includes( nomFichier ))
-                    nomImport = nomFichierPourImport;
-                // import <prefixe>_<nom> from <chemin>
-                else if (request.default !== undefined) {
-                    nomImport = request.default + '_' + nomFichierPourImport.replace(
+                // import templates from '@/earn/serveur/emails/*.hbs';
+                if (imported.type === 'default') {
+
+                    const importName = imported.name + '_' + nomFichierPourImport.replace(
                         /[^a-z0-9]/gi, '_'
-                    );
+                    );  
+
                     importedFiles.push({ 
                         ...file, 
                         imported: nomFichierPourImport, 
-                        local: nomImport
+                        local: importName
                     })
+
+                    importSpecifier = t.importDefaultSpecifier( 
+                        t.identifier(importName) 
+                    );
+
+                // import * as templates from '@/earn/serveur/emails/*.hbs';
+                } else if (imported.type === 'all') {
+
+                    const importName = imported.name + '_' + nomFichierPourImport.replace(
+                        /[^a-z0-9]/gi, '_'
+                    );  
+
+                    importSpecifier = t.importNamespaceSpecifier( 
+                        t.identifier(importName) 
+                    );
+
+                // import { notifications, inscription } from '@/earn/serveur/emails/*.hbs';
+                } else if (imported.type === 'destructuration' && imported.names.includes( nomFichier )) {
+
+                    importSpecifier = t.importDefaultSpecifier( 
+                        t.identifier(nomFichierPourImport) 
+                    );
+
                 } else
                     continue;
-
-                // Création de l'importation
-                importDeclarations.push(
-                    t.importDeclaration(
-                        [ request.all
-                            ? t.importNamespaceSpecifier( t.identifier(nomImport) )
-                            : t.importDefaultSpecifier( t.identifier(nomImport) )
-                        ],
-                        t.stringLiteral(file.filename)
-                    )
-                );
             }
+
+            // Création de l'importation
+            importDeclarations.push(
+                t.importDeclaration(
+                    [importSpecifier],
+                    t.stringLiteral(file.filename)
+                )
+            );
         }
 
         return { files: importedFiles, declarations: importDeclarations }
@@ -411,14 +442,14 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             const allfiles = getFiles(rootDir);
 
             // Find matches + keep captured groups
-            debugRule && console.log(`Searching for files matching ${request.source} in directory ${rootDir}`);
+            debugRule && console.log(LogPrefix, `Searching for files matching ${request.source} in directory ${rootDir}`);
             const regex = micromatch.makeRe(cheminGlob, { capture: true });
             for (const file of allfiles) {
                 const matches = file.match(regex);
                 if (matches) 
                     matchedFiles.push({ filename: file, matches: matches.slice(1) });
             }
-            debugRule && console.log('IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
+            debugRule && console.log(LogPrefix, 'IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
         }
 
         return { 
