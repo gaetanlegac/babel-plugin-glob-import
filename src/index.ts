@@ -30,6 +30,16 @@ import type {
 } from './types';
 
 /*----------------------------------
+- TYPES
+----------------------------------*/
+
+export type {
+    GlobImported,
+    GlobImportedWithMetas,
+    ImportTransformer
+} from './types';
+
+/*----------------------------------
 - WEBPACK RULE
 ----------------------------------*/
 
@@ -37,13 +47,15 @@ const ruleBuilder = (options: TOptions, rules: ImportTransformer[]) => [Plugin, 
 module.exports = ruleBuilder;
 export default ruleBuilder;
 
-
 /*----------------------------------
-- CONFIG
+- CONST
 ----------------------------------*/
 
 const LogPrefix = '[babel][glob-imports]';
 const MetasPrefix = 'metas:';
+
+export const filenameToImportName = (filename: string) => filename.replace(/[^a-z0-9]/gi, '_')
+module.exports.filenameToImportName = filenameToImportName;
 
 /*----------------------------------
 - PLUGIN
@@ -186,11 +198,11 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
 
                 const importedfiles = request.withMetas
                     ? importations.files.map( file => t.objectProperty(
-                        t.stringLiteral(file.imported),
+                        t.stringLiteral(file.local),
                         fileMetasObject( file, t.identifier(file.local ))
                     ))
                     : importations.files.map( file => t.objectProperty(
-                        t.stringLiteral(file.imported),
+                        t.stringLiteral(file.local),
                         t.identifier(file.local),
                     ))
 
@@ -354,9 +366,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 // import templates from '@/earn/serveur/emails/*.hbs';
                 if (imported.type === 'default') {
 
-                    const importName = imported.name + '_' + nomFichierPourImport.replace(
-                        /[^a-z0-9]/gi, '_'
-                    );  
+                    const importName = /*imported.name + '_' + */filenameToImportName(nomFichierPourImport);
 
                     importedFiles.push({ 
                         ...file, 
@@ -366,18 +376,22 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
 
                     importSpecifier = t.importDefaultSpecifier( 
                         t.identifier(importName) 
-                    );
-
+                    )
+                
                 // import * as templates from '@/earn/serveur/emails/*.hbs';
                 } else if (imported.type === 'all') {
 
-                    const importName = imported.name + '_' + nomFichierPourImport.replace(
-                        /[^a-z0-9]/gi, '_'
-                    );  
+                    const importName = filenameToImportName(nomFichierPourImport);
 
-                    importSpecifier = t.importNamespaceSpecifier( 
+                    importedFiles.push({ 
+                        ...file, 
+                        imported: nomFichierPourImport, 
+                        local: importName
+                    })
+
+                    importSpecifier = t.importNamespaceSpecifier(
                         t.identifier(importName) 
-                    );
+                    )
 
                 // import { notifications, inscription } from '@/earn/serveur/emails/*.hbs';
                 } else if (imported.type === 'destructuration' && imported.names.includes( nomFichier )) {
