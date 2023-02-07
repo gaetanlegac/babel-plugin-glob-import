@@ -338,6 +338,10 @@ BabelGlobImport({ }, [{
 
 ## Changelog
 
+### 07/02/2023
+
+- Fixed issue where generated importation statement as invalid (the imported name was empty)
+
 ### 06/01/2023
 
 - Add a comment before an import to debug it. Ex:

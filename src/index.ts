@@ -54,7 +54,7 @@ export default ruleBuilder;
 const LogPrefix = '[babel][glob-imports]';
 const MetasPrefix = 'metas:';
 
-export const filenameToImportName = (filename: string) => filename.replace(/[^a-z0-9]/gi, '_')
+export const filenameToImportName = (filename: string) => filename.replace(/[^a-z0-9]/gi, '_') || 'index';
 module.exports.filenameToImportName = filenameToImportName;
 
 /*----------------------------------
