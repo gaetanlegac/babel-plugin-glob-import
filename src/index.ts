@@ -193,8 +193,15 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             // Import all the files
             const importations = importfiles(files, request);
 
+            // Simply import files
+            if (request.imported === undefined) {
+
+                replacement = [
+                    ...importations.declarations,
+                ]
+
             // Combine the imported files in one object
-            if (request.imported.type === 'default' || request.imported.type === 'all') {
+            } else if (request.imported.type === 'default' || request.imported.type === 'all') {
 
                 const importedfiles = request.withMetas
                     ? importations.files.map( file => t.objectProperty(
@@ -252,6 +259,9 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
 
             dbgTitle('Parsed import:'),
             request,
+
+            dbgTitle('Found files:'),
+            found.files,
 
             dbgTitle('Generated import:'),
             replacement ? generate( t.program(replacement) ).code : 'nothing',
@@ -350,7 +360,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 continue;
 
             // Import specifiers
-            let importSpecifier: types.ImportDeclaration["specifiers"][number];
+            let importSpecifier: types.ImportDeclaration["specifiers"][number] | undefined;
             const imported = request.imported;
             if (imported !== undefined) {
 
@@ -366,7 +376,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 // import templates from '@/earn/serveur/emails/*.hbs';
                 if (imported.type === 'default') {
 
-                    const importName = /*imported.name + '_' + */filenameToImportName(nomFichierPourImport);
+                    const importName = filenameToImportName(nomFichierPourImport);
 
                     importedFiles.push({ 
                         ...file, 
@@ -407,7 +417,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             // Création de l'importation
             importDeclarations.push(
                 t.importDeclaration(
-                    [importSpecifier],
+                    importSpecifier ? [importSpecifier] : [],
                     t.stringLiteral(file.filename)
                 )
             );
