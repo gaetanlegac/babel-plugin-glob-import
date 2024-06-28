@@ -212,15 +212,12 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             // Combine the imported files in one object
             } else if (request.imported.type === 'default' || request.imported.type === 'all') {
 
-                const importedfiles = request.withMetas
-                    ? importations.files.map( file => t.objectProperty(
-                        t.stringLiteral(file.local),
-                        fileMetasObject( file, t.identifier(file.local ))
-                    ))
-                    : importations.files.map( file => t.objectProperty(
-                        t.stringLiteral(file.local),
-                        t.identifier(file.local),
-                    ))
+                const importedfiles = importations.files.map( file => t.objectProperty(
+                    t.stringLiteral(file.exportName),
+                    request.withMetas 
+                        ? fileMetasObject( file, t.identifier(file.local ))
+                        : t.identifier(file.local))
+                );
 
                 replacement = [
                     ...importations.declarations,
@@ -381,7 +378,9 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                     posSlash,
                     posExt > posSlash ? posExt : undefined
                 )
+
                 const nomFichierPourImport = [filePrefix, ...file.matches].join('_')
+                const exportName = file.matches.join('_');
                 
                 // import templates from '@/earn/serveur/emails/*.hbs';
                 if (imported.type === 'default') {
@@ -391,7 +390,8 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                     importedFiles.push({ 
                         ...file, 
                         imported: nomFichierPourImport, 
-                        local: importName
+                        local: importName,
+                        exportName
                     })
 
                     importSpecifier = t.importDefaultSpecifier( 
@@ -406,7 +406,8 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                     importedFiles.push({ 
                         ...file, 
                         imported: nomFichierPourImport, 
-                        local: importName
+                        local: importName,
+                        exportName
                     })
 
                     importSpecifier = t.importNamespaceSpecifier(

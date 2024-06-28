@@ -79,7 +79,8 @@ export type FileMatch = {
 
 export type ImportedFile = FileMatch & {
     local: string,
-    imported: string
+    imported: string,
+    exportName: string
 }
 
 export type GlobImportedWithMetas<TModuleExports extends any> = (
