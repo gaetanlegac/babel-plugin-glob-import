@@ -4,8 +4,6 @@ Babel plugin to use glob patterns in import and require statements.
 
 [![npm](https://img.shields.io/npm/v/babel-plugin-glob-import)](https://www.npmjs.com/package/babel-plugin-glob-import) [![npm](https://img.shields.io/npm/dw/babel-plugin-glob-import)](https://www.npmjs.com/package/babel-plugin-glob-import)
 
-/!\ This module is still in testing and may be unstable in several scenarios.
-
 ## Installation
 
 ```bash
@@ -337,6 +335,10 @@ BabelGlobImport({ }, [{
 ```
 
 ## Changelog
+
+### 28/06/2024
+
+- Fixed potential naming conflict between two imports. An error was trigerred when you import two different folders having the same structure.
 
 ### 13/07/2023
 

@@ -57,6 +57,15 @@ const MetasPrefix = 'metas:';
 export const filenameToImportName = (filename: string) => filename.replace(/[^a-z0-9]/gi, '_') || 'index';
 module.exports.filenameToImportName = filenameToImportName;
 
+function uid() {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+    let uniqueId = '';
+    for (let i = 0; i < 5; i++) {
+        uniqueId += letters.charAt(Math.floor(Math.random() * letters.length));
+    }
+    return uniqueId;
+}
+
 /*----------------------------------
 - PLUGIN
 ----------------------------------*/
@@ -352,6 +361,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
 
         let importedFiles: ImportedFile[] = []
         let importDeclarations: types.Statement[] | void = [];
+        const filePrefix = request.imported?.['name'] || uid;
 
         for (const file of files) {
 
@@ -371,7 +381,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                     posSlash,
                     posExt > posSlash ? posExt : undefined
                 )
-                const nomFichierPourImport = file.matches.join('_')
+                const nomFichierPourImport = [filePrefix, ...file.matches].join('_')
                 
                 // import templates from '@/earn/serveur/emails/*.hbs';
                 if (imported.type === 'default') {
