@@ -481,8 +481,10 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             const regex = micromatch.makeRe(cheminGlob, { capture: true });
             for (const file of allfiles) {
                 const matches = file.match(regex);
-                if (matches) 
-                    matchedFiles.push({ filename: file, matches: matches.slice(1) });
+                if (matches) {
+                    const mergedMatches = mergeGlobMatches(matches);
+                    matchedFiles.push({ filename: file, matches: mergedMatches });
+                }
             }
             debugRule && console.log(LogPrefix, 'IMPORT GLOB', request.source, '=>', cheminGlob, matchingRule ? 'from rule' : '', matchedFiles)
         }
@@ -492,6 +494,45 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
             files: matchedFiles, 
             replace: matchingRule?.replace 
         };
+    }
+
+    function mergeGlobMatches([ fileName, ...matches ]: string[] ) {
+
+        if (matches.length === 0) return [];
+
+        let results: string[] = [];
+        let current: string | undefined = matches[0];
+        let currentIndex = current ? fileName.indexOf(current) : -1;
+
+        for (let i = 1; i < matches.length; i++) {
+            let next = matches[i];
+
+            if (current === undefined) {
+                current = next;
+                currentIndex = current ? fileName.indexOf(current) : -1;
+                continue;
+            }
+
+            if (next === undefined) continue;
+
+            let nextIndex = fileName.indexOf(next, currentIndex + current.length);
+
+            if (nextIndex <= currentIndex + current.length) {
+                // If the next match is adjacent or overlapping, merge it
+                let overlap = currentIndex + current.length - nextIndex;
+                current += next.slice(overlap);
+            } else {
+                results.push(current);
+                current = next;
+                currentIndex = fileName.indexOf(current);
+            }
+        }
+
+        if (current !== undefined) {
+            results.push(current);
+        }
+
+        return results;
     }
 
     function getFiles( dir: string ) {
