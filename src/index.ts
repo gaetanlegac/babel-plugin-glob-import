@@ -5,6 +5,7 @@
 // Node
 import path from 'path';
 import fs from 'fs';
+const ShortUniqueId = require('short-unique-id');
 
 // Npm
 import { PluginObj, NodePath } from '@babel/core';
@@ -53,18 +54,13 @@ export default ruleBuilder;
 
 const LogPrefix = '[babel][glob-imports]';
 const MetasPrefix = 'metas:';
+const uid = new ShortUniqueId({ length: 10 });
 
 export const filenameToImportName = (filename: string) => filename.replace(/[^a-z0-9]/gi, '_') || 'index';
 module.exports.filenameToImportName = filenameToImportName;
 
-function uid() {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-    let uniqueId = '';
-    for (let i = 0; i < 5; i++) {
-        uniqueId += letters.charAt(Math.floor(Math.random() * letters.length));
-    }
-    return uniqueId;
-}
+// Prevent the uid from starting with a number
+const genUID = () => 'i' + uid.rnd();
 
 /*----------------------------------
 - PLUGIN
@@ -358,7 +354,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
 
         let importedFiles: ImportedFile[] = []
         let importDeclarations: types.Statement[] | void = [];
-        const filePrefix = request.imported?.['name'] || uid;
+        const filePrefix = request.imported?.['name'] || genUID();
 
         for (const file of files) {
 
@@ -385,7 +381,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 // import templates from '@/earn/serveur/emails/*.hbs';
                 if (imported.type === 'default') {
 
-                    const importName = filenameToImportName(nomFichierPourImport);
+                    const importName = genUID();;
 
                     importedFiles.push({ 
                         ...file, 
@@ -401,7 +397,7 @@ function Plugin (babel, options: TOptions & { rules: ImportTransformer[] }) {
                 // import * as templates from '@/earn/serveur/emails/*.hbs';
                 } else if (imported.type === 'all') {
 
-                    const importName = filenameToImportName(nomFichierPourImport);
+                    const importName = genUID();;
 
                     importedFiles.push({ 
                         ...file, 

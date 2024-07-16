@@ -613,6 +613,10 @@ BabelGlobImport({ }, [{
 
 ## Changelog
 
+### 16/07/2024
+
+- Fix conflict between import names
+
 ### 15/07/2024
 
 - Added support for using regex and other shortcuts in glob patterns
